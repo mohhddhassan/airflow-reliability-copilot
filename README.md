@@ -163,7 +163,7 @@ docker compose down -v
 
 ## Demo video
 
-A ≤3 minute walkthrough of the failure → investigation → AI diagnosis → human approval → remediation loop is linked here: [Drive Link](https://drive.google.com/file/d/1vD5m40c09-pA8xYmOTYDS1YNz97e0QsM/view?usp=sharing)
+A ≤3 minute walkthrough of the failure → investigation → AI diagnosis → human approval → remediation loop is linked here: [Youtube Link](https://youtu.be/i-WvC-6gWik)
 
 ## Airflow 3.1 features used
 
