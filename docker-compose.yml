@@ -1,0 +1,141 @@
+x-airflow-common: &airflow-common
+  build: .
+  environment: &airflow-common-env
+    AIRFLOW__CORE__EXECUTOR: LocalExecutor
+    AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres/airflow
+    AIRFLOW__CORE__LOAD_EXAMPLES: "false"
+    AIRFLOW__API__EXPOSE_CONFIG: "true"
+    AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: "true"
+    AIRFLOW_UID: "50000"
+
+    # Shared across all services -- without this, each container signs
+    # task-execution JWTs with its own random secret and verification
+    # fails ("Signature verification failed"). Demo value only.
+    AIRFLOW__API_AUTH__JWT_SECRET: "reliability-copilot-demo-jwt-secret-change-me"
+
+    # Everyone who opens the UI is auto-admin, no login screen -- zero
+    # setup friction for anyone running this project. For real named
+    # users (audit trail shows who approved what), see
+    # docker-compose.recording.yml.
+    AIRFLOW__CORE__SIMPLE_AUTH_MANAGER_ALL_ADMINS: "True"
+
+    # Task execution talks to the API server over HTTP and defaults to
+    # localhost:8080, which is wrong here since webserver and scheduler
+    # are separate containers -- must point at the webserver's network name.
+    AIRFLOW__CORE__EXECUTION_API_SERVER_URL: "http://airflow-webserver:8080/execution/"
+
+    # ClickHouse connection details, read by include/clickhouse_client.py
+    CLICKHOUSE_HOST: clickhouse
+    CLICKHOUSE_HTTP_PORT: "8123"
+    CLICKHOUSE_USER: default
+    CLICKHOUSE_PASSWORD: ""
+    CLICKHOUSE_DATABASE: reliability_demo
+
+    # Optional -- real push notification for HITL approvals. Set in .env;
+    # silently skipped if unset. See include/notifiers.py for how to get one.
+    GOOGLE_CHAT_WEBHOOK_URL: "${GOOGLE_CHAT_WEBHOOK_URL:-}"
+
+    # Common AI Provider (PydanticAI-based): conn_type is always
+    # "pydanticai", model/provider goes in extra. Set GOOGLE_API_KEY in
+    # .env; swap the model string for other providers (see .env.example).
+    AIRFLOW_CONN_PYDANTICAI_DEFAULT: >-
+      {"conn_type": "pydanticai", "password": "${GOOGLE_API_KEY:-}", "extra": {"model": "google:gemini-3.6-flash"}}
+  volumes:
+    - ./dags:/opt/airflow/dags
+    - ./include:/opt/airflow/include
+    - airflow-logs:/opt/airflow/logs
+    - airflow-plugins:/opt/airflow/plugins
+  depends_on: &airflow-common-depends-on
+    postgres:
+      condition: service_healthy
+    clickhouse:
+      condition: service_healthy
+
+services:
+  postgres:
+    image: postgres:17
+    environment:
+      POSTGRES_USER: airflow
+      POSTGRES_PASSWORD: airflow
+      POSTGRES_DB: airflow
+    volumes:
+      - postgres-db-volume:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "airflow"]
+      interval: 5s
+      retries: 5
+    restart: unless-stopped
+
+  clickhouse:
+    image: clickhouse/clickhouse-server:26.3
+    environment:
+      CLICKHOUSE_SKIP_USER_SETUP: "1"
+    ports:
+      - "8123:8123"
+    volumes:
+      - clickhouse-data:/var/lib/clickhouse
+      - ./include/clickhouse_init:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8123/ping"]
+      interval: 5s
+      retries: 10
+    restart: unless-stopped
+
+  airflow-init:
+    <<: *airflow-common
+    entrypoint: /bin/bash
+    command:
+      - -c
+      - |
+        airflow db migrate
+        # No `airflow users create` -- Simple Auth Manager doesn't use it.
+    depends_on: *airflow-common-depends-on
+
+  airflow-webserver:
+    <<: *airflow-common
+    command: api-server
+    ports:
+      - "8080:8080"
+    depends_on:
+      <<: *airflow-common-depends-on
+      airflow-init:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "http://localhost:8080/api/v2/monitor/health"]
+      interval: 10s
+      timeout: 10s
+      retries: 5
+    restart: unless-stopped
+
+  airflow-scheduler:
+    <<: *airflow-common
+    command: scheduler
+    depends_on:
+      <<: *airflow-common-depends-on
+      airflow-init:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+  airflow-triggerer:
+    <<: *airflow-common
+    command: triggerer
+    depends_on:
+      <<: *airflow-common-depends-on
+      airflow-init:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+  airflow-dag-processor:
+    <<: *airflow-common
+    command: dag-processor
+    depends_on:
+      <<: *airflow-common-depends-on
+      airflow-init:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+volumes:
+  postgres-db-volume:
+  clickhouse-data:
+  airflow-logs:
+  airflow-plugins:

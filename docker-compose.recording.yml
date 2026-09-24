@@ -1,0 +1,24 @@
+# default anonymous-admin auth.
+#
+# Usage:
+#   docker compose down -v
+#   docker compose -f docker-compose.yml -f docker-compose.recording.yml up --build
+#   docker compose exec airflow-webserver cat /opt/airflow/logs/simple_auth_manager_passwords.json.generated
+#
+# Logs you in as "hussain" (rename below), and gives orders_pipeline's
+# failure callback a separate "reliability-bot" service account -- so
+# HITL approvals and the `incidents` audit log show real identities
+# instead of "Anonymous"/"unknown". To revert, drop the extra -f flag
+# after another `down -v`.
+
+x-airflow-common:
+  &airflow-common
+  environment:
+    &airflow-common-env
+    AIRFLOW__CORE__SIMPLE_AUTH_MANAGER_ALL_ADMINS: "False"
+    AIRFLOW__CORE__SIMPLE_AUTH_MANAGER_USERS: "hussain:admin,reliability-bot:user"
+
+    # Points passwords at the shared airflow-logs volume -- otherwise the
+    # webserver (which generates them) and scheduler (which needs to read
+    # them) see two different, unrelated files.
+    AIRFLOW__CORE__SIMPLE_AUTH_MANAGER_PASSWORDS_FILE: "/opt/airflow/logs/simple_auth_manager_passwords.json.generated"
