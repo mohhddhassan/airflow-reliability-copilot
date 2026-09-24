@@ -1,7 +1,7 @@
 # Airflow Reliability Copilot
 
 **Beyond the DAG: Data Engineering Hackathon 2026 - Astronomer**
-**Track:** Keep a Human in the Loop (Human-in-the-Loop) - also qualifies for the *Airflow Can Do That?!* wildcard track
+**Track:** Keep a Human in the Loop (Human-in-the-Loop)
 **License:** MIT (see [LICENSE](./LICENSE))
 
 ## What it does
@@ -163,7 +163,7 @@ docker compose down -v
 
 ## Demo video
 
-A ≤3 minute walkthrough of the failure → investigation → AI diagnosis → human approval → remediation loop is linked here: `<ADD_DEMO_VIDEO_LINK_HERE>`.
+A ≤3 minute walkthrough of the failure → investigation → AI diagnosis → human approval → remediation loop is linked here: [Drive Link](https://drive.google.com/file/d/1vD5m40c09-pA8xYmOTYDS1YNz97e0QsM/view?usp=sharing)
 
 ## Airflow 3.1 features used
 
@@ -206,4 +206,4 @@ By default, a pending approval only shows up if you're watching the Airflow UI. 
 
 ## License
 
-MIT - see [LICENSE](./LICENSE). You retain ownership of your fork/contributions; the repository is public per hackathon rules.
+MIT - see [LICENSE](./LICENSE).
